@@ -78,7 +78,7 @@ test-suite spec
     , network >= 2.6
     , QuickCheck >= 2.7
     , servant == 0.4.*
-    , servant-client
+    , servant-haxl-client
     , servant-server == 0.4.*
     , text
     , wai
