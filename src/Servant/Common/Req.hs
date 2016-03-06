@@ -1,60 +1,61 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeFamilies          #-}
 module Servant.Common.Req where
 
 #if !MIN_VERSION_base(4,8,0)
-import Control.Applicative
+import           Control.Applicative
 #endif
-import Control.Concurrent.Async
-import Control.Concurrent.QSem
-import Control.Exception
-import Control.Monad
-import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Either
-import Data.ByteString.Lazy hiding (pack, filter, map, null, elem)
-import Data.String
-import Data.String.Conversions
-import Data.Proxy
-import Data.Text (Text)
-import Data.Text.Encoding
-import Data.Hashable
-import GHC.Generics
-import Haxl.Core hiding (Request, catch)
-import Network.HTTP.Client hiding (Proxy)
-import Network.HTTP.Media
-import Network.HTTP.Types
-import qualified Network.HTTP.Types.Header   as HTTP
-import Network.URI
-import Servant.API.ContentTypes
-import Servant.Common.BaseUrl
-import Servant.Common.Text
+import           Control.Concurrent.Async
+import           Control.Concurrent.QSem
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.Catch        (MonadThrow, throwM)
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Either
+import           Data.ByteString.Lazy       hiding (elem, filter, map, null,
+                                             pack)
+import           Data.Hashable
+import           Data.Proxy
+import           Data.String
+import           Data.String.Conversions
+import           Data.Text                  (Text)
+import           Data.Text.Encoding
+import           GHC.Generics
+import           Haxl.Core                  hiding (Request, catch)
+import           Network.HTTP.Client        hiding (Proxy)
+import           Network.HTTP.Media
+import           Network.HTTP.Types
+import qualified Network.HTTP.Types.Header  as HTTP
+import           Network.URI
+import           Servant.API.ContentTypes
+import           Servant.Common.BaseUrl
+import           Servant.Common.Text
 
-import qualified Network.HTTP.Client as Client
+import qualified Network.HTTP.Client        as Client
 
 data ServantError
   = FailureResponse
-    { responseStatus            :: Status
-    , responseContentType       :: MediaType
-    , responseBody              :: ByteString
+    { responseStatus      :: Status
+    , responseContentType :: MediaType
+    , responseBody        :: ByteString
     }
   | DecodeFailure
-    { decodeError               :: String
-    , responseContentType       :: MediaType
-    , responseBody              :: ByteString
+    { decodeError         :: String
+    , responseContentType :: MediaType
+    , responseBody        :: ByteString
     }
   | UnsupportedContentType
-    { responseContentType       :: MediaType
-    , responseBody              :: ByteString
+    { responseContentType :: MediaType
+    , responseBody        :: ByteString
     }
   | ConnectionError
-    { connectionError           :: HttpException
+    { connectionError :: HttpException
     }
   | InvalidContentTypeHeader
     { responseContentTypeHeader :: ByteString

@@ -1,13 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns  #-}
 module Servant.Common.BaseUrl where
 
-import Data.Hashable
-import Data.List
-import GHC.Generics
-import Network.URI
-import Safe
-import Text.Read
+import           Data.Hashable
+import           Data.List
+import           GHC.Generics
+import           Network.URI
+import           Safe
+import           Text.Read
 
 -- | URI scheme to use
 data Scheme =
@@ -23,8 +23,8 @@ instance Hashable Scheme where
 --   for servant's automatically-generated clients.
 data BaseUrl = BaseUrl
   { baseUrlScheme :: Scheme -- ^ URI scheme to use
-  , baseUrlHost :: String   -- ^ host (eg "haskell.org")
-  , baseUrlPort :: Int      -- ^ port (eg 80)
+  , baseUrlHost   :: String   -- ^ host (eg "haskell.org")
+  , baseUrlPort   :: Int      -- ^ port (eg 80)
   } deriving (Show, Eq, Ord, Generic)
 
 instance Hashable BaseUrl where

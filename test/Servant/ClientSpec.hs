@@ -27,7 +27,7 @@ import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Text                  as T
 import           GHC.Generics
-import           Haxl.Core hiding (try)
+import           Haxl.Core                  hiding (try)
 import qualified Network.HTTP.Client        as C
 import           Network.HTTP.Media
 import           Network.HTTP.Types         hiding (Header)
@@ -48,7 +48,7 @@ import           Servant.Server
 
 data Person = Person {
   name :: String,
-  age :: Integer
+  age  :: Integer
  }
   deriving (Eq, Show, Generic)
 
