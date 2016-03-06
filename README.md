@@ -13,8 +13,8 @@ type MyApi = "books" :> Get '[JSON] [Book] -- GET /books
 myApi :: Proxy MyApi
 myApi = Proxy
 
-getAllBooks :: GenHaxl [Book]
-postNewBook :: Book -> GenHaxl Book
+getAllBooks :: GenHaxl () [Book]
+postNewBook :: Book -> GenHaxl () Book
 -- 'client' allows you to produce operations to query an API from a client.
 (getAllBooks :<|> postNewBook) = client myApi host
   where host = BaseUrl Http "localhost" 8080
