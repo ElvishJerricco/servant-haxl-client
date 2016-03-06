@@ -1,25 +1,33 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Servant.Common.Req where
 
 #if !MIN_VERSION_base(4,8,0)
 import Control.Applicative
 #endif
+import Control.Concurrent.Async
+import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
-import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Either
 import Data.ByteString.Lazy hiding (pack, filter, map, null, elem)
-import Data.IORef
 import Data.String
 import Data.String.Conversions
 import Data.Proxy
 import Data.Text (Text)
 import Data.Text.Encoding
+import Data.Hashable
+import GHC.Generics
+import Haxl.Core hiding (Request, catch)
 import Network.HTTP.Client hiding (Proxy)
-import Network.HTTP.Client.TLS
 import Network.HTTP.Media
 import Network.HTTP.Types
 import qualified Network.HTTP.Types.Header   as HTTP
@@ -27,7 +35,6 @@ import Network.URI
 import Servant.API.ContentTypes
 import Servant.Common.BaseUrl
 import Servant.Common.Text
-import System.IO.Unsafe
 
 import qualified Network.HTTP.Client as Client
 
@@ -55,13 +62,29 @@ data ServantError
     }
   deriving (Show)
 
+instance Exception ServantError where
+
 data Req = Req
   { reqPath   :: String
   , qs        :: QueryText
   , reqBody   :: Maybe (ByteString, MediaType)
   , reqAccept :: [MediaType]
   , headers   :: [(String, Text)]
-  }
+  } deriving (Show, Eq, Ord, Generic)
+
+instance Hashable Req where
+  hashWithSalt s (Req p q b a h) = hashWithSalt s (p, q, bHash, aHash, h)
+    where
+      hashMediaType m = hashWithSalt s (show m)
+      bHash = fmap (fmap hashMediaType) b
+      aHash = fmap hashMediaType a
+
+data WantedStatusCodes = AllCodes | SelectCodes [Int]
+  deriving (Show, Eq, Ord, Generic)
+
+instance Hashable WantedStatusCodes where
+  hashWithSalt s AllCodes = hashWithSalt s (0::Int)
+  hashWithSalt s (SelectCodes codes) = hashWithSalt s (1::Int, codes)
 
 defReq :: Req
 defReq = Req "" [] Nothing [] []
@@ -93,14 +116,14 @@ addHeader name val req = req { headers = headers req
 setRQBody :: ByteString -> MediaType -> Req -> Req
 setRQBody b t req = req { reqBody = Just (b, t) }
 
-reqToRequest :: (Functor m, MonadThrow m) => Req -> BaseUrl -> m Request
+reqToRequest :: MonadThrow m => Req -> BaseUrl -> m Request
 reqToRequest req (BaseUrl reqScheme reqHost reqPort) =
-    fmap (setheaders . setAccept . setrqb . setQS ) $ parseUrl url
+    (setheaders . setAccept . setrqb . setQS) <$> parseUrl url
 
   where url = show $ nullURI { uriScheme = case reqScheme of
                                   Http  -> "http:"
                                   Https -> "https:"
-                             , uriAuthority = Just $
+                             , uriAuthority = Just
                                  URIAuth { uriUserInfo = ""
                                          , uriRegName = reqHost
                                          , uriPort = ":" ++ show reqPort
@@ -125,31 +148,21 @@ reqToRequest req (BaseUrl reqScheme reqHost reqPort) =
 
 -- * performing requests
 
-{-# NOINLINE __manager #-}
-__manager :: IORef Manager
-__manager = unsafePerformIO (newManager tlsManagerSettings >>= newIORef)
-
-__withGlobalManager :: (Manager -> IO a) -> IO a
-__withGlobalManager action = readIORef __manager >>= action
-
-
 displayHttpRequest :: Method -> String
 displayHttpRequest httpmethod = "HTTP " ++ cs httpmethod ++ " request"
 
 
-performRequest :: Method -> Req -> (Int -> Bool) -> BaseUrl
+performRequest_ :: Manager -> Method -> Req -> WantedStatusCodes -> BaseUrl
                -> EitherT ServantError IO ( Int, ByteString, MediaType
                                           , [HTTP.Header], Response ByteString)
-performRequest reqMethod req isWantedStatus reqHost = do
+performRequest_ manager reqMethod req wantedStatus reqHost = do
   partialRequest <- liftIO $ reqToRequest req reqHost
 
   let request = partialRequest { Client.method = reqMethod
                                , checkStatus = \ _status _headers _cookies -> Nothing
                                }
 
-  eResponse <- liftIO $ __withGlobalManager $ \ manager ->
-    catchHttpException $
-    Client.httpLbs request manager
+  eResponse <- liftIO $ catchHttpException $ Client.httpLbs request manager
   case eResponse of
     Left err ->
       left $ ConnectionError err
@@ -164,27 +177,67 @@ performRequest reqMethod req isWantedStatus reqHost = do
                  Just t -> case parseAccept t of
                    Nothing -> left $ InvalidContentTypeHeader (cs t) body
                    Just t' -> pure t'
-      unless (isWantedStatus status_code) $
+      unless (wantedStatus `wants` status_code) $
         left $ FailureResponse status ct body
       return (status_code, body, ct, hrds, response)
-
-
-performRequestCT :: MimeUnrender ct result =>
-  Proxy ct -> Method -> Req -> [Int] -> BaseUrl -> EitherT ServantError IO ([HTTP.Header], result)
-performRequestCT ct reqMethod req wantedStatus reqHost = do
-  let acceptCT = contentType ct
-  (_status, respBody, respCT, hrds, _response) <-
-    performRequest reqMethod (req { reqAccept = [acceptCT] }) (`elem` wantedStatus) reqHost
-  unless (matches respCT (acceptCT)) $ left $ UnsupportedContentType respCT respBody
-  case mimeUnrender ct respBody of
-    Left err -> left $ DecodeFailure err respCT respBody
-    Right val -> return (hrds, val)
-
-performRequestNoBody :: Method -> Req -> [Int] -> BaseUrl -> EitherT ServantError IO ()
-performRequestNoBody reqMethod req wantedStatus reqHost = do
-  _ <- performRequest reqMethod req (`elem` wantedStatus) reqHost
-  return ()
+      where
+        wants AllCodes _ = True
+        wants (SelectCodes codes) status_code = status_code `elem` codes
 
 catchHttpException :: IO a -> IO (Either HttpException a)
 catchHttpException action =
   catch (Right <$> action) (pure . Left)
+
+data ServantRequest a where
+  ServantRequest :: Method -> Req -> WantedStatusCodes -> BaseUrl ->
+    ServantRequest (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
+
+deriving instance Show (ServantRequest a)
+deriving instance Eq (ServantRequest a)
+
+instance Show1 ServantRequest where
+  show1 = show
+
+instance Hashable (ServantRequest a) where
+  hashWithSalt s (ServantRequest m r w h) = hashWithSalt s (m, r, w, h)
+
+instance StateKey ServantRequest where
+  data State ServantRequest = ServantRequestState Int Manager
+
+instance DataSourceName ServantRequest where
+  dataSourceName _ = "ServantRequest"
+
+instance DataSource () ServantRequest where
+  fetch (ServantRequestState numThreads manager) _ () requests = AsyncFetch $ \inner -> do
+    sem <- newQSem numThreads
+    asyncs <- mapM (handler sem) requests
+    inner
+    mapM_ wait asyncs
+    where
+      handler :: QSem -> BlockedFetch ServantRequest -> IO (Async ())
+      handler sem (BlockedFetch ((ServantRequest met req wantedStatus reqHost) :: ServantRequest a) rvar) =
+        async $ bracket_ (waitQSem sem) (signalQSem sem) $ do
+          e <- runEitherT $ performRequest_ manager met req wantedStatus reqHost
+          case e of
+            Left err -> putFailure rvar err
+            Right a -> putSuccess rvar a
+          return ()
+
+performRequest :: Method -> Req -> WantedStatusCodes -> BaseUrl -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
+performRequest m r w h = dataFetch $ ServantRequest m r w h
+
+performRequestCT :: MimeUnrender ct result =>
+  Proxy ct -> Method -> Req -> WantedStatusCodes -> BaseUrl -> GenHaxl () ([HTTP.Header], result)
+performRequestCT ct reqMethod req wantedStatus reqHost = do
+  let acceptCT = contentType ct
+  (_status, respBody, respCT, hrds, _response) <-
+    performRequest reqMethod (req { reqAccept = [acceptCT] }) wantedStatus reqHost
+  unless (matches respCT acceptCT) $ throwM $ UnsupportedContentType respCT respBody
+  case mimeUnrender ct respBody of
+    Left err -> throwM $ DecodeFailure err respCT respBody
+    Right val -> return (hrds, val)
+
+performRequestNoBody :: Method -> Req -> WantedStatusCodes -> BaseUrl -> GenHaxl () ()
+performRequestNoBody reqMethod req wantedStatus reqHost = do
+  _ <- performRequest reqMethod req wantedStatus reqHost
+  return ()

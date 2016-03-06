@@ -16,6 +16,7 @@
 -- API.
 module Servant.Client
   ( client
+  , initServantClientState
   , HasClient(..)
   , ServantError(..)
   , module Servant.Common.BaseUrl
@@ -25,14 +26,15 @@ module Servant.Client
 import           Control.Applicative        ((<$>))
 #endif
 import           Control.Monad
-import           Control.Monad.Trans.Either
 import           Data.ByteString.Lazy       (ByteString)
 import           Data.List
 import           Data.Proxy
 import           Data.String.Conversions
 import           Data.Text                  (unpack)
 import           GHC.TypeLits
-import           Network.HTTP.Client        (Response)
+import           Haxl.Core                  (GenHaxl, State)
+import           Network.HTTP.Client hiding (Proxy)
+import           Network.HTTP.Client.TLS
 import           Network.HTTP.Media
 import qualified Network.HTTP.Types         as H
 import qualified Network.HTTP.Types.Header  as HTTP
@@ -55,7 +57,11 @@ import           Servant.Common.Req
 -- > (getAllBooks :<|> postNewBook) = client myApi host
 -- >   where host = BaseUrl Http "localhost" 8080
 client :: HasClient layout => Proxy layout -> BaseUrl -> Client layout
-client p baseurl = clientWithRoute p defReq baseurl
+client p = clientWithRoute p defReq
+
+initServantClientState :: Int -> IO (State ServantRequest)
+initServantClientState numThreads =
+  ServantRequestState numThreads <$> newManager tlsManagerSettings
 
 -- | This class lets us define how each API combinator
 -- influences the creation of an HTTP request. It's mostly
@@ -129,9 +135,9 @@ instance
 #endif
   -- See https://downloads.haskell.org/~ghc/7.8.2/docs/html/users_guide/type-class-extensions.html#undecidable-instances
   (MimeUnrender ct a, cts' ~ (ct ': cts)) => HasClient (Delete cts' a) where
-  type Client (Delete cts' a) = EitherT ServantError IO a
+  type Client (Delete cts' a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
-    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodDelete req [200, 202] baseurl
+    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodDelete req (SelectCodes [200, 202]) baseurl
 
 -- | If you have a 'Delete xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
@@ -140,9 +146,9 @@ instance
          {-# OVERLAPPING #-}
 #endif
   HasClient (Delete cts ()) where
-  type Client (Delete cts ()) = EitherT ServantError IO ()
+  type Client (Delete cts ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
-    void $ performRequestNoBody H.methodDelete req [204] baseurl
+    void $ performRequestNoBody H.methodDelete req (SelectCodes [204]) baseurl
 
 -- | If you have a 'Delete xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
@@ -153,12 +159,12 @@ instance
   -- See https://downloads.haskell.org/~ghc/7.8.2/docs/html/users_guide/type-class-extensions.html#undecidable-instances
   ( MimeUnrender ct a, BuildHeadersTo ls, cts' ~ (ct ': cts)
   ) => HasClient (Delete cts' (Headers ls a)) where
-  type Client (Delete cts' (Headers ls a)) = EitherT ServantError IO (Headers ls a)
+  type Client (Delete cts' (Headers ls a)) = GenHaxl () (Headers ls a)
   clientWithRoute Proxy req baseurl = do
-    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodDelete req [200, 202] baseurl
-    return $ Headers { getResponse = resp
-                     , getHeadersHList = buildHeadersTo hdrs
-                     }
+    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodDelete req (SelectCodes [200, 202]) baseurl
+    return Headers { getResponse = resp
+                   , getHeadersHList = buildHeadersTo hdrs
+                   }
 
 -- | If you have a 'Get' endpoint in your API, the client
 -- side querying function that is created when calling 'client'
@@ -169,9 +175,9 @@ instance
          {-# OVERLAPPABLE #-}
 #endif
   (MimeUnrender ct result) => HasClient (Get (ct ': cts) result) where
-  type Client (Get (ct ': cts) result) = EitherT ServantError IO result
+  type Client (Get (ct ': cts) result) = GenHaxl () result
   clientWithRoute Proxy req baseurl =
-    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodGet req [200, 203] baseurl
+    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodGet req (SelectCodes [200, 203]) baseurl
 
 -- | If you have a 'Get xs ()' endpoint, the client expects a 204 No Content
 -- HTTP status.
@@ -180,9 +186,9 @@ instance
          {-# OVERLAPPING #-}
 #endif
   HasClient (Get (ct ': cts) ()) where
-  type Client (Get (ct ': cts) ()) = EitherT ServantError IO ()
-  clientWithRoute Proxy req baseurl =
-    performRequestNoBody H.methodGet req [204] baseurl
+  type Client (Get (ct ': cts) ()) = GenHaxl () ()
+  clientWithRoute Proxy req =
+    performRequestNoBody H.methodGet req (SelectCodes [204])
 
 -- | If you have a 'Get xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
@@ -192,12 +198,12 @@ instance
 #endif
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Get (ct ': cts) (Headers ls a)) where
-  type Client (Get (ct ': cts) (Headers ls a)) = EitherT ServantError IO (Headers ls a)
+  type Client (Get (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
   clientWithRoute Proxy req baseurl = do
-    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodGet req [200, 203, 204] baseurl
-    return $ Headers { getResponse = resp
-                     , getHeadersHList = buildHeadersTo hdrs
-                     }
+    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodGet req (SelectCodes [200, 203, 204]) baseurl
+    return Headers { getResponse = resp
+                   , getHeadersHList = buildHeadersTo hdrs
+                   }
 
 -- | If you use a 'Header' in one of your endpoints in your API,
 -- the corresponding querying function will automatically take
@@ -250,9 +256,9 @@ instance
          {-# OVERLAPPABLE #-}
 #endif
   (MimeUnrender ct a) => HasClient (Post (ct ': cts) a) where
-  type Client (Post (ct ': cts) a) = EitherT ServantError IO a
+  type Client (Post (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
-    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPost req [200, 201, 202] baseurl
+    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPost req (SelectCodes [200, 201, 202]) baseurl
 
 -- | If you have a 'Post xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
@@ -261,9 +267,9 @@ instance
          {-# OVERLAPPING #-}
 #endif
   HasClient (Post (ct ': cts) ()) where
-  type Client (Post (ct ': cts) ()) = EitherT ServantError IO ()
+  type Client (Post (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
-    void $ performRequestNoBody H.methodPost req [204] baseurl
+    void $ performRequestNoBody H.methodPost req (SelectCodes [204]) baseurl
 
 -- | If you have a 'Post xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
@@ -273,12 +279,12 @@ instance
 #endif
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Post (ct ': cts) (Headers ls a)) where
-  type Client (Post (ct ': cts) (Headers ls a)) = EitherT ServantError IO (Headers ls a)
+  type Client (Post (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
   clientWithRoute Proxy req baseurl = do
-    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPost req [200, 201, 202] baseurl
-    return $ Headers { getResponse = resp
-                     , getHeadersHList = buildHeadersTo hdrs
-                     }
+    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPost req (SelectCodes [200, 201, 202]) baseurl
+    return Headers { getResponse = resp
+                   , getHeadersHList = buildHeadersTo hdrs
+                   }
 
 -- | If you have a 'Put' endpoint in your API, the client
 -- side querying function that is created when calling 'client'
@@ -289,9 +295,9 @@ instance
          {-# OVERLAPPABLE #-}
 #endif
   (MimeUnrender ct a) => HasClient (Put (ct ': cts) a) where
-  type Client (Put (ct ': cts) a) = EitherT ServantError IO a
+  type Client (Put (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
-    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPut req [200,201] baseurl
+    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPut req (SelectCodes [200,201]) baseurl
 
 -- | If you have a 'Put xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
@@ -300,9 +306,9 @@ instance
          {-# OVERLAPPING #-}
 #endif
   HasClient (Put (ct ': cts) ()) where
-  type Client (Put (ct ': cts) ()) = EitherT ServantError IO ()
+  type Client (Put (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
-    void $ performRequestNoBody H.methodPut req [204] baseurl
+    void $ performRequestNoBody H.methodPut req (SelectCodes [204]) baseurl
 
 -- | If you have a 'Put xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
@@ -312,12 +318,12 @@ instance
 #endif
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Put (ct ': cts) (Headers ls a)) where
-  type Client (Put (ct ': cts) (Headers ls a)) = EitherT ServantError IO (Headers ls a)
+  type Client (Put (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
   clientWithRoute Proxy req baseurl = do
-    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPut req [200, 201] baseurl
-    return $ Headers { getResponse = resp
-                     , getHeadersHList = buildHeadersTo hdrs
-                     }
+    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPut req (SelectCodes [200, 201]) baseurl
+    return Headers { getResponse = resp
+                   , getHeadersHList = buildHeadersTo hdrs
+                   }
 
 -- | If you have a 'Patch' endpoint in your API, the client
 -- side querying function that is created when calling 'client'
@@ -328,9 +334,9 @@ instance
          {-# OVERLAPPABLE #-}
 #endif
   (MimeUnrender ct a) => HasClient (Patch (ct ': cts) a) where
-  type Client (Patch (ct ': cts) a) = EitherT ServantError IO a
+  type Client (Patch (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
-    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPatch req [200,201] baseurl
+    snd <$> performRequestCT (Proxy :: Proxy ct) H.methodPatch req (SelectCodes [200,201]) baseurl
 
 -- | If you have a 'Patch xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
@@ -339,9 +345,9 @@ instance
          {-# OVERLAPPING #-}
 #endif
   HasClient (Patch (ct ': cts) ()) where
-  type Client (Patch (ct ': cts) ()) = EitherT ServantError IO ()
+  type Client (Patch (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
-    void $ performRequestNoBody H.methodPatch req [204] baseurl
+    void $ performRequestNoBody H.methodPatch req (SelectCodes [204]) baseurl
 
 -- | If you have a 'Patch xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
@@ -351,12 +357,12 @@ instance
 #endif
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Patch (ct ': cts) (Headers ls a)) where
-  type Client (Patch (ct ': cts) (Headers ls a)) = EitherT ServantError IO (Headers ls a)
+  type Client (Patch (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
   clientWithRoute Proxy req baseurl = do
-    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPatch req [200, 201, 204] baseurl
-    return $ Headers { getResponse = resp
-                     , getHeadersHList = buildHeadersTo hdrs
-                     }
+    (hdrs, resp) <- performRequestCT (Proxy :: Proxy ct) H.methodPatch req (SelectCodes [200, 201, 204]) baseurl
+    return Headers { getResponse = resp
+                   , getHeadersHList = buildHeadersTo hdrs
+                   }
 
 -- | If you use a 'QueryParam' in one of your endpoints in your API,
 -- the corresponding querying function will automatically take
@@ -618,11 +624,10 @@ instance (KnownSymbol sym, HasClient sublayout)
 -- | Pick a 'Method' and specify where the server you want to query is. You get
 -- back the full `Response`.
 instance HasClient Raw where
-  type Client Raw = H.Method -> EitherT ServantError IO (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
+  type Client Raw = H.Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
 
   clientWithRoute :: Proxy Raw -> Req -> BaseUrl -> Client Raw
-  clientWithRoute Proxy req baseurl httpMethod = do
-    performRequest httpMethod req (const True) baseurl
+  clientWithRoute Proxy req baseurl httpMethod = performRequest httpMethod req AllCodes baseurl
 
 -- | If you use a 'ReqBody' in one of your endpoints in your API,
 -- the corresponding querying function will automatically take
@@ -662,10 +667,7 @@ instance (MimeRender ct a, HasClient sublayout)
 instance (KnownSymbol path, HasClient sublayout) => HasClient (path :> sublayout) where
   type Client (path :> sublayout) = Client sublayout
 
-  clientWithRoute Proxy req baseurl =
-     clientWithRoute (Proxy :: Proxy sublayout)
-                     (appendToPath p req)
-                     baseurl
+  clientWithRoute Proxy req =
+     clientWithRoute (Proxy :: Proxy sublayout) (appendToPath p req)
 
     where p = symbolVal (Proxy :: Proxy path)
-

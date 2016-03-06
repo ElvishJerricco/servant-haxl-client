@@ -2,6 +2,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Servant.Common.BaseUrl where
 
+import Data.Hashable
 import Data.List
 import GHC.Generics
 import Network.URI
@@ -14,6 +15,10 @@ data Scheme =
   | Https -- ^ https://
   deriving (Show, Eq, Ord, Generic)
 
+instance Hashable Scheme where
+  hashWithSalt s Http = hashWithSalt s (0 :: Int)
+  hashWithSalt s Https = hashWithSalt s (1 :: Int)
+
 -- | Simple data type to represent the target of HTTP requests
 --   for servant's automatically-generated clients.
 data BaseUrl = BaseUrl
@@ -21,6 +26,9 @@ data BaseUrl = BaseUrl
   , baseUrlHost :: String   -- ^ host (eg "haskell.org")
   , baseUrlPort :: Int      -- ^ port (eg 80)
   } deriving (Show, Eq, Ord, Generic)
+
+instance Hashable BaseUrl where
+  hashWithSalt s (BaseUrl sc h p) = hashWithSalt s (sc, h, p)
 
 showBaseUrl :: BaseUrl -> String
 showBaseUrl (BaseUrl urlscheme host port) =

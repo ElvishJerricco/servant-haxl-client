@@ -27,6 +27,7 @@ import           Data.Monoid
 import           Data.Proxy
 import qualified Data.Text                  as T
 import           GHC.Generics
+import           Haxl.Core hiding (try)
 import qualified Network.HTTP.Client        as C
 import           Network.HTTP.Media
 import           Network.HTTP.Types         hiding (Header)
@@ -147,23 +148,33 @@ failServer = serve failApi (
 withFailServer :: (BaseUrl -> IO a) -> IO a
 withFailServer action = withWaiDaemon (return failServer) action
 
+testHaxl :: GenHaxl () a -> IO (Either ServantError a)
+testHaxl haxl = do
+  env <- getEnv
+  try $ runHaxl env haxl
+  where
+    getEnv :: IO (Env ())
+    getEnv = do
+      state <- initServantClientState 4
+      initEnv (stateSet state stateEmpty) ()
+
 spec :: IO ()
 spec = withServer $ \ baseUrl -> do
-  let getGet :: EitherT ServantError IO Person
-      getDeleteEmpty :: EitherT ServantError IO ()
-      getCapture :: String -> EitherT ServantError IO Person
-      getBody :: Person -> EitherT ServantError IO Person
-      getQueryParam :: Maybe String -> EitherT ServantError IO Person
-      getQueryParams :: [String] -> EitherT ServantError IO [Person]
-      getQueryFlag :: Bool -> EitherT ServantError IO Bool
-      getMatrixParam :: Maybe String -> EitherT ServantError IO Person
-      getMatrixParams :: [String] -> EitherT ServantError IO [Person]
-      getMatrixFlag :: Bool -> EitherT ServantError IO Bool
-      getRawSuccess :: Method -> EitherT ServantError IO (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
-      getRawFailure :: Method -> EitherT ServantError IO (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
-      getMultiple :: String -> Maybe Int -> Bool -> [(String, [Rational])] -> EitherT ServantError IO (String, Maybe Int, Bool, [(String, [Rational])])
-      getRespHeaders :: EitherT ServantError IO (Headers TestHeaders Bool)
-      getDeleteContentType :: EitherT ServantError IO ()
+  let getGet :: GenHaxl () Person
+      getDeleteEmpty :: GenHaxl () ()
+      getCapture :: String -> GenHaxl () Person
+      getBody :: Person -> GenHaxl () Person
+      getQueryParam :: Maybe String -> GenHaxl () Person
+      getQueryParams :: [String] -> GenHaxl () [Person]
+      getQueryFlag :: Bool -> GenHaxl () Bool
+      getMatrixParam :: Maybe String -> GenHaxl () Person
+      getMatrixParams :: [String] -> GenHaxl () [Person]
+      getMatrixFlag :: Bool -> GenHaxl () Bool
+      getRawSuccess :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
+      getRawFailure :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
+      getMultiple :: String -> Maybe Int -> Bool -> [(String, [Rational])] -> GenHaxl () (String, Maybe Int, Bool, [(String, [Rational])])
+      getRespHeaders :: GenHaxl () (Headers TestHeaders Bool)
+      getDeleteContentType :: GenHaxl () ()
       (     getGet
        :<|> getDeleteEmpty
        :<|> getCapture
@@ -183,54 +194,54 @@ spec = withServer $ \ baseUrl -> do
 
   hspec $ do
     it "Servant.API.Get" $ do
-      (Arrow.left show <$> runEitherT getGet) `shouldReturn` Right alice
+      (Arrow.left show <$> testHaxl getGet) `shouldReturn` Right alice
 
     describe "Servant.API.Delete" $ do
       it "allows empty content type" $ do
-        (Arrow.left show <$> runEitherT getDeleteEmpty) `shouldReturn` Right ()
+        (Arrow.left show <$> testHaxl getDeleteEmpty) `shouldReturn` Right ()
 
       it "allows content type" $ do
-        (Arrow.left show <$> runEitherT getDeleteContentType) `shouldReturn` Right ()
+        (Arrow.left show <$> testHaxl getDeleteContentType) `shouldReturn` Right ()
 
     it "Servant.API.Capture" $ do
-      (Arrow.left show <$> runEitherT (getCapture "Paula")) `shouldReturn` Right (Person "Paula" 0)
+      (Arrow.left show <$> testHaxl (getCapture "Paula")) `shouldReturn` Right (Person "Paula" 0)
 
     it "Servant.API.ReqBody" $ do
       let p = Person "Clara" 42
-      (Arrow.left show <$> runEitherT (getBody p)) `shouldReturn` Right p
+      (Arrow.left show <$> testHaxl (getBody p)) `shouldReturn` Right p
 
     it "Servant.API.QueryParam" $ do
-      Arrow.left show <$> runEitherT (getQueryParam (Just "alice")) `shouldReturn` Right alice
-      Left FailureResponse{..} <- runEitherT (getQueryParam (Just "bob"))
+      Arrow.left show <$> testHaxl (getQueryParam (Just "alice")) `shouldReturn` Right alice
+      Left FailureResponse{..} <- testHaxl (getQueryParam (Just "bob"))
       responseStatus `shouldBe` Status 400 "bob not found"
 
     it "Servant.API.QueryParam.QueryParams" $ do
-      (Arrow.left show <$> runEitherT (getQueryParams [])) `shouldReturn` Right []
-      (Arrow.left show <$> runEitherT (getQueryParams ["alice", "bob"]))
+      (Arrow.left show <$> testHaxl (getQueryParams [])) `shouldReturn` Right []
+      (Arrow.left show <$> testHaxl (getQueryParams ["alice", "bob"]))
         `shouldReturn` Right [Person "alice" 0, Person "bob" 1]
 
     context "Servant.API.QueryParam.QueryFlag" $
       forM_ [False, True] $ \ flag ->
       it (show flag) $ do
-        (Arrow.left show <$> runEitherT (getQueryFlag flag)) `shouldReturn` Right flag
+        (Arrow.left show <$> testHaxl (getQueryFlag flag)) `shouldReturn` Right flag
 
     it "Servant.API.MatrixParam" $ do
-      Arrow.left show <$> runEitherT (getMatrixParam (Just "alice")) `shouldReturn` Right alice
-      Left FailureResponse{..} <- runEitherT (getMatrixParam (Just "bob"))
+      Arrow.left show <$> testHaxl (getMatrixParam (Just "alice")) `shouldReturn` Right alice
+      Left FailureResponse{..} <- testHaxl (getMatrixParam (Just "bob"))
       responseStatus `shouldBe` Status 400 "bob not found"
 
     it "Servant.API.MatrixParam.MatrixParams" $ do
-      Arrow.left show <$> runEitherT (getMatrixParams []) `shouldReturn` Right []
-      Arrow.left show <$> runEitherT (getMatrixParams ["alice", "bob"])
+      Arrow.left show <$> testHaxl (getMatrixParams []) `shouldReturn` Right []
+      Arrow.left show <$> testHaxl (getMatrixParams ["alice", "bob"])
         `shouldReturn` Right [Person "alice" 0, Person "bob" 1]
 
     context "Servant.API.MatrixParam.MatrixFlag" $
       forM_ [False, True] $ \ flag ->
       it (show flag) $ do
-        Arrow.left show <$> runEitherT (getMatrixFlag flag) `shouldReturn` Right flag
+        Arrow.left show <$> testHaxl (getMatrixFlag flag) `shouldReturn` Right flag
 
     it "Servant.API.Raw on success" $ do
-      res <- runEitherT (getRawSuccess methodGet)
+      res <- testHaxl (getRawSuccess methodGet)
       case res of
         Left e -> assertFailure $ show e
         Right (code, body, ct, _, response) -> do
@@ -239,7 +250,7 @@ spec = withServer $ \ baseUrl -> do
           C.responseStatus response `shouldBe` ok200
 
     it "Servant.API.Raw on failure" $ do
-      res <- runEitherT (getRawFailure methodGet)
+      res <- testHaxl (getRawFailure methodGet)
       case res of
         Left e -> assertFailure $ show e
         Right (code, body, ct, _, response) -> do
@@ -248,7 +259,7 @@ spec = withServer $ \ baseUrl -> do
           C.responseStatus response `shouldBe` badRequest400
 
     it "Returns headers appropriately" $ withServer $ \ _ -> do
-      res <- runEitherT getRespHeaders
+      res <- testHaxl getRespHeaders
       case res of
         Left e -> assertFailure $ show e
         Right val -> getHeaders val `shouldBe` [("X-Example1", "1729"), ("X-Example2", "eg2")]
@@ -257,7 +268,7 @@ spec = withServer $ \ baseUrl -> do
       it "works for a combination of Capture, QueryParam, QueryFlag and ReqBody" $
         property $ forAllShrink pathGen shrink $ \(NonEmpty cap) num flag body ->
           ioProperty $ do
-            result <- Arrow.left show <$> runEitherT (getMultiple cap num flag body)
+            result <- Arrow.left show <$> testHaxl (getMultiple cap num flag body)
             return $
               result === Right (cap, num, flag, body)
 
@@ -268,9 +279,9 @@ spec = withServer $ \ baseUrl -> do
             it desc $
             withWaiDaemon (return (serve api (left $ ServantErr 500 "error message" "" []))) $
             \ host -> do
-              let getResponse :: EitherT ServantError IO ()
+              let getResponse :: GenHaxl () ()
                   getResponse = client api host
-              Left FailureResponse{..} <- runEitherT getResponse
+              Left FailureResponse{..} <- testHaxl getResponse
               responseStatus `shouldBe` (Status 500 "error message")
       mapM_ test $
         (WrappedApi (Proxy :: Proxy (Delete '[JSON] ())), "Delete") :
@@ -281,54 +292,54 @@ spec = withServer $ \ baseUrl -> do
 
 failSpec :: IO ()
 failSpec = withFailServer $ \ baseUrl -> do
-  let getGet :: EitherT ServantError IO Person
-      getDeleteEmpty :: EitherT ServantError IO ()
-      getCapture :: String -> EitherT ServantError IO Person
-      getBody :: Person -> EitherT ServantError IO Person
+  let getGet :: GenHaxl () Person
+      getDeleteEmpty :: GenHaxl () ()
+      getCapture :: String -> GenHaxl () Person
+      getBody :: Person -> GenHaxl () Person
       (     getGet
        :<|> getDeleteEmpty
        :<|> getCapture
        :<|> getBody
        :<|> _ )
          = client api baseUrl
-      getGetWrongHost :: EitherT ServantError IO Person
+      getGetWrongHost :: GenHaxl () Person
       (getGetWrongHost :<|> _) = client api (BaseUrl Http "127.0.0.1" 19872)
 
   hspec $ do
     context "client returns errors appropriately" $ do
       it "reports FailureResponse" $ do
-        Left res <- runEitherT getDeleteEmpty
+        Left res <- testHaxl getDeleteEmpty
         case res of
           FailureResponse (Status 404 "Not Found") _ _ -> return ()
           _ -> fail $ "expected 404 response, but got " <> show res
 
       it "reports DecodeFailure" $ do
-        Left res <- runEitherT (getCapture "foo")
+        Left res <- testHaxl (getCapture "foo")
         case res of
           DecodeFailure _ ("application/json") _ -> return ()
           _ -> fail $ "expected DecodeFailure, but got " <> show res
 
       it "reports ConnectionError" $ do
-        Left res <- runEitherT getGetWrongHost
+        Left res <- testHaxl getGetWrongHost
         case res of
           ConnectionError (C.FailedConnectionException2 "127.0.0.1" 19872 False _) -> return ()
           _ -> fail $ "expected ConnectionError, but got " <> show res
 
       it "reports UnsupportedContentType" $ do
-        Left res <- runEitherT getGet
+        Left res <- testHaxl getGet
         case res of
           UnsupportedContentType ("application/octet-stream") _ -> return ()
           _ -> fail $ "expected UnsupportedContentType, but got " <> show res
 
       it "reports InvalidContentTypeHeader" $ do
-        Left res <- runEitherT (getBody alice)
+        Left res <- testHaxl (getBody alice)
         case res of
           InvalidContentTypeHeader "fooooo" _ -> return ()
           _ -> fail $ "expected InvalidContentTypeHeader, but got " <> show res
 
 data WrappedApi where
   WrappedApi :: (HasServer api, Server api ~ EitherT ServantErr IO a,
-                 HasClient api, Client api ~ EitherT ServantError IO ()) =>
+                 HasClient api, Client api ~ GenHaxl () ()) =>
     Proxy api -> WrappedApi
 
 
