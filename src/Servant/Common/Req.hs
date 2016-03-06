@@ -8,9 +8,6 @@
 {-# LANGUAGE TypeFamilies          #-}
 module Servant.Common.Req where
 
-#if !MIN_VERSION_base(4,8,0)
-import           Control.Applicative
-#endif
 import           Control.Concurrent.Async
 import           Control.Concurrent.QSem
 import           Control.Exception

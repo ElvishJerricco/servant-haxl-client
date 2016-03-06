@@ -8,9 +8,6 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-#if !MIN_VERSION_base(4,8,0)
-{-# LANGUAGE OverlappingInstances #-}
-#endif
 -- | This module provides 'client' which can automatically generate
 -- querying functions for each endpoint just from the type representing your
 -- API.
@@ -22,9 +19,6 @@ module Servant.Client
   , module Servant.Common.BaseUrl
   ) where
 
-#if !MIN_VERSION_base(4,8,0)
-import           Control.Applicative        ((<$>))
-#endif
 import           Control.Monad
 import           Data.ByteString.Lazy       (ByteString)
 import           Data.List
@@ -129,10 +123,7 @@ instance (KnownSymbol capture, ToText a, HasClient sublayout)
 -- side querying function that is created when calling 'client'
 -- will just require an argument that specifies the scheme, host
 -- and port to send the request to.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPABLE #-}
-#endif
+instance {-# OVERLAPPABLE #-}
   -- See https://downloads.haskell.org/~ghc/7.8.2/docs/html/users_guide/type-class-extensions.html#undecidable-instances
   (MimeUnrender ct a, cts' ~ (ct ': cts)) => HasClient (Delete cts' a) where
   type Client (Delete cts' a) = GenHaxl () a
@@ -141,10 +132,7 @@ instance
 
 -- | If you have a 'Delete xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   HasClient (Delete cts ()) where
   type Client (Delete cts ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
@@ -152,10 +140,7 @@ instance
 
 -- | If you have a 'Delete xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   -- See https://downloads.haskell.org/~ghc/7.8.2/docs/html/users_guide/type-class-extensions.html#undecidable-instances
   ( MimeUnrender ct a, BuildHeadersTo ls, cts' ~ (ct ': cts)
   ) => HasClient (Delete cts' (Headers ls a)) where
@@ -170,10 +155,7 @@ instance
 -- side querying function that is created when calling 'client'
 -- will just require an argument that specifies the scheme, host
 -- and port to send the request to.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPABLE #-}
-#endif
+instance {-# OVERLAPPABLE #-}
   (MimeUnrender ct result) => HasClient (Get (ct ': cts) result) where
   type Client (Get (ct ': cts) result) = GenHaxl () result
   clientWithRoute Proxy req baseurl =
@@ -181,10 +163,7 @@ instance
 
 -- | If you have a 'Get xs ()' endpoint, the client expects a 204 No Content
 -- HTTP status.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   HasClient (Get (ct ': cts) ()) where
   type Client (Get (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req =
@@ -192,10 +171,7 @@ instance
 
 -- | If you have a 'Get xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Get (ct ': cts) (Headers ls a)) where
   type Client (Get (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
@@ -251,10 +227,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
 -- side querying function that is created when calling 'client'
 -- will just require an argument that specifies the scheme, host
 -- and port to send the request to.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPABLE #-}
-#endif
+instance {-# OVERLAPPABLE #-}
   (MimeUnrender ct a) => HasClient (Post (ct ': cts) a) where
   type Client (Post (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
@@ -262,10 +235,7 @@ instance
 
 -- | If you have a 'Post xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   HasClient (Post (ct ': cts) ()) where
   type Client (Post (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
@@ -273,10 +243,7 @@ instance
 
 -- | If you have a 'Post xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Post (ct ': cts) (Headers ls a)) where
   type Client (Post (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
@@ -290,10 +257,7 @@ instance
 -- side querying function that is created when calling 'client'
 -- will just require an argument that specifies the scheme, host
 -- and port to send the request to.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPABLE #-}
-#endif
+instance {-# OVERLAPPABLE #-}
   (MimeUnrender ct a) => HasClient (Put (ct ': cts) a) where
   type Client (Put (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
@@ -301,10 +265,7 @@ instance
 
 -- | If you have a 'Put xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   HasClient (Put (ct ': cts) ()) where
   type Client (Put (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
@@ -312,10 +273,7 @@ instance
 
 -- | If you have a 'Put xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Put (ct ': cts) (Headers ls a)) where
   type Client (Put (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)
@@ -329,10 +287,7 @@ instance
 -- side querying function that is created when calling 'client'
 -- will just require an argument that specifies the scheme, host
 -- and port to send the request to.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPABLE #-}
-#endif
+instance {-# OVERLAPPABLE #-}
   (MimeUnrender ct a) => HasClient (Patch (ct ': cts) a) where
   type Client (Patch (ct ': cts) a) = GenHaxl () a
   clientWithRoute Proxy req baseurl =
@@ -340,10 +295,7 @@ instance
 
 -- | If you have a 'Patch xs ()' endpoint, the client expects a 204 No Content
 -- HTTP header.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   HasClient (Patch (ct ': cts) ()) where
   type Client (Patch (ct ': cts) ()) = GenHaxl () ()
   clientWithRoute Proxy req baseurl =
@@ -351,10 +303,7 @@ instance
 
 -- | If you have a 'Patch xs (Headers ls x)' endpoint, the client expects the
 -- corresponding headers.
-instance
-#if MIN_VERSION_base(4,8,0)
-         {-# OVERLAPPING #-}
-#endif
+instance {-# OVERLAPPING #-}
   ( MimeUnrender ct a, BuildHeadersTo ls
   ) => HasClient (Patch (ct ': cts) (Headers ls a)) where
   type Client (Patch (ct ': cts) (Headers ls a)) = GenHaxl () (Headers ls a)

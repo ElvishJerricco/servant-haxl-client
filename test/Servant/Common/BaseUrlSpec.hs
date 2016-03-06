@@ -2,9 +2,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Servant.Common.BaseUrlSpec where
 
-#if !MIN_VERSION_base(4,8,0)
-import           Control.Applicative
-#endif
 import           Control.DeepSeq
 import           Test.Hspec
 import           Test.QuickCheck

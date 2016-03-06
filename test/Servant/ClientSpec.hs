@@ -12,9 +12,6 @@
 
 module Servant.ClientSpec where
 
-#if !MIN_VERSION_base(4,8,0)
-import           Control.Applicative         ((<$>))
-#endif
 import qualified Control.Arrow              as Arrow
 import           Control.Concurrent
 import           Control.Exception
