@@ -38,7 +38,7 @@ import           Test.HUnit
 import           Test.QuickCheck
 
 import           Servant.API
-import           Servant.Client
+import           Servant.Client.Haxl
 import           Servant.Server
 
 -- * test data types

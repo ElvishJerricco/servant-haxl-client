@@ -25,9 +25,9 @@ source-repository head
 
 library
   exposed-modules:
-    Servant.Client
-    Servant.Common.BaseUrl
-    Servant.Common.Req
+    Servant.Client.Haxl
+    Servant.Common.BaseUrl.Haxl
+    Servant.Common.Req.Haxl
   build-depends:
       base >=4.8 && <5
     , aeson

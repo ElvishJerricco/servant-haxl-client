@@ -6,35 +6,35 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
-module Servant.Common.Req where
+module Servant.Common.Req.Haxl where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.QSem
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.Catch        (MonadThrow, throwM)
+import           Control.Monad.Catch         (MonadThrow, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Either
-import           Data.ByteString.Lazy       hiding (elem, filter, map, null,
-                                             pack)
+import           Data.ByteString.Lazy        hiding (elem, filter, map, null,
+                                              pack)
 import           Data.Hashable
 import           Data.Proxy
 import           Data.String
 import           Data.String.Conversions
-import           Data.Text                  (Text)
+import           Data.Text                   (Text)
 import           Data.Text.Encoding
 import           GHC.Generics
-import           Haxl.Core                  hiding (Request, catch)
-import           Network.HTTP.Client        hiding (Proxy)
+import           Haxl.Core                   hiding (Request, catch)
+import           Network.HTTP.Client         hiding (Proxy)
 import           Network.HTTP.Media
 import           Network.HTTP.Types
-import qualified Network.HTTP.Types.Header  as HTTP
+import qualified Network.HTTP.Types.Header   as HTTP
 import           Network.URI
 import           Servant.API.ContentTypes
-import           Servant.Common.BaseUrl
+import           Servant.Common.BaseUrl.Haxl
 import           Servant.Common.Text
 
-import qualified Network.HTTP.Client        as Client
+import qualified Network.HTTP.Client         as Client
 
 data ServantError
   = FailureResponse

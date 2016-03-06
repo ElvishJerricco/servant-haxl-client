@@ -6,7 +6,7 @@ import           Control.DeepSeq
 import           Test.Hspec
 import           Test.QuickCheck
 
-import           Servant.Common.BaseUrl
+import           Servant.Common.BaseUrl.Haxl
 
 spec :: Spec
 spec = do

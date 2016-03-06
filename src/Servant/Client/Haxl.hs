@@ -11,12 +11,12 @@
 -- | This module provides 'client' which can automatically generate
 -- querying functions for each endpoint just from the type representing your
 -- API.
-module Servant.Client
+module Servant.Client.Haxl
   ( client
   , initServantClientState
   , HasClient(..)
   , ServantError(..)
-  , module Servant.Common.BaseUrl
+  , module Servant.Common.BaseUrl.Haxl
   ) where
 
 import           Control.Monad
@@ -33,8 +33,8 @@ import           Network.HTTP.Media
 import qualified Network.HTTP.Types         as H
 import qualified Network.HTTP.Types.Header  as HTTP
 import           Servant.API
-import           Servant.Common.BaseUrl
-import           Servant.Common.Req
+import           Servant.Common.BaseUrl.Haxl
+import           Servant.Common.Req.Haxl
 
 -- * Accessing APIs as a Client
 
@@ -216,7 +216,7 @@ instance (KnownSymbol sym, ToText a, HasClient sublayout)
   clientWithRoute Proxy req baseurl mval =
     clientWithRoute (Proxy :: Proxy sublayout)
                     (maybe req
-                           (\value -> Servant.Common.Req.addHeader hname value req)
+                           (\value -> Servant.Common.Req.Haxl.addHeader hname value req)
                            mval
                     )
                     baseurl
