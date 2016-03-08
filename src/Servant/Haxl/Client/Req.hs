@@ -26,6 +26,7 @@ import           Data.Text.Encoding
 import           GHC.Generics
 import           Haxl.Core                   hiding (Request, catch)
 import           Network.HTTP.Client         hiding (Proxy)
+import           Network.HTTP.Client.TLS
 import           Network.HTTP.Media
 import           Network.HTTP.Types
 import qualified Network.HTTP.Types.Header   as HTTP
@@ -220,6 +221,10 @@ instance DataSource () ServantRequest where
             Left err -> putFailure rvar err
             Right a -> putSuccess rvar a
           return ()
+
+initServantClientState :: Int -> IO (State ServantRequest)
+initServantClientState numThreads =
+  ServantRequestState numThreads <$> newManager tlsManagerSettings
 
 performRequest :: Method -> Req -> WantedStatusCodes -> BaseUrl -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
 performRequest m r w h = dataFetch $ ServantRequest m r w h

@@ -26,9 +26,8 @@ import           Data.Proxy
 import           Data.String.Conversions
 import           Data.Text                  (unpack)
 import           GHC.TypeLits
-import           Haxl.Core                  (GenHaxl, State)
+import           Haxl.Core                  (GenHaxl)
 import           Network.HTTP.Client hiding (Proxy)
-import           Network.HTTP.Client.TLS
 import           Network.HTTP.Media
 import qualified Network.HTTP.Types         as H
 import qualified Network.HTTP.Types.Header  as HTTP
@@ -52,10 +51,6 @@ import           Servant.Haxl.Client.Req
 -- >   where host = BaseUrl Http "localhost" 8080
 client :: HasClient layout => Proxy layout -> BaseUrl -> Client layout
 client p = clientWithRoute p defReq
-
-initServantClientState :: Int -> IO (State ServantRequest)
-initServantClientState numThreads =
-  ServantRequestState numThreads <$> newManager tlsManagerSettings
 
 -- | This class lets us define how each API combinator
 -- influences the creation of an HTTP request. It's mostly
