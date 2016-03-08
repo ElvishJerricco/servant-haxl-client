@@ -16,6 +16,8 @@ module Servant.Haxl.Client
   , initServantClientState
   , HasClient(..)
   , ServantError(..)
+  , ServantResponse
+  , ServantConnectionError
   , module Servant.Haxl.Client.BaseUrl
   ) where
 
@@ -27,7 +29,6 @@ import           Data.String.Conversions
 import           Data.Text                  (unpack)
 import           GHC.TypeLits
 import           Haxl.Core                  (GenHaxl)
-import           Network.HTTP.Client hiding (Proxy)
 import           Network.HTTP.Media
 import qualified Network.HTTP.Types         as H
 import qualified Network.HTTP.Types.Header  as HTTP
@@ -35,6 +36,8 @@ import           Servant.API
 import           Servant.Haxl.Client.Types
 import           Servant.Haxl.Client.Req
 import           Servant.Haxl.Client.BaseUrl
+import           Servant.Haxl.Client.Internal
+import           Servant.Haxl.Client.Internal.Error
 
 -- * Accessing APIs as a Client
 
@@ -569,7 +572,7 @@ instance (KnownSymbol sym, HasClient sublayout)
 -- | Pick a 'Method' and specify where the server you want to query is. You get
 -- back the full `Response`.
 instance HasClient Raw where
-  type Client Raw = H.Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], Response ByteString)
+  type Client Raw = H.Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], ServantResponse)
 
   clientWithRoute :: Proxy Raw -> Req -> BaseUrl -> Client Raw
   clientWithRoute Proxy req baseurl httpMethod = performRequest httpMethod req AllCodes baseurl

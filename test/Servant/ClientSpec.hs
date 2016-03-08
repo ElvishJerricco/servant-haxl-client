@@ -12,25 +12,25 @@
 
 module Servant.ClientSpec where
 
-import qualified Control.Arrow              as Arrow
+import qualified Control.Arrow                      as Arrow
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad.Trans.Either
 import           Data.Aeson
-import           Data.ByteString.Lazy       (ByteString)
+import           Data.ByteString.Lazy               (ByteString)
 import           Data.Char
-import           Data.Foldable              (forM_)
+import           Data.Foldable                      (forM_)
 import           Data.Monoid
 import           Data.Proxy
-import qualified Data.Text                  as T
+import qualified Data.Text                          as T
 import           GHC.Generics
-import           Haxl.Core                  hiding (try)
-import qualified Network.HTTP.Client        as C
+import           Haxl.Core                          hiding (try)
+import qualified Network.HTTP.Client                as C
 import           Network.HTTP.Media
-import           Network.HTTP.Types         hiding (Header)
-import qualified Network.HTTP.Types         as HTTP
+import           Network.HTTP.Types                 hiding (Header)
+import qualified Network.HTTP.Types                 as HTTP
 import           Network.Socket
-import           Network.Wai                hiding (Response)
+import           Network.Wai                        hiding (Response)
 import           Network.Wai.Handler.Warp
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
@@ -39,6 +39,8 @@ import           Test.QuickCheck
 
 import           Servant.API
 import           Servant.Haxl.Client
+import           Servant.Haxl.Client.Internal
+import           Servant.Haxl.Client.Internal.Error
 import           Servant.Server
 
 -- * test data types
@@ -67,6 +69,7 @@ instance FromFormUrlEncoded Person where
         return $ Person (T.unpack n) (read $ T.unpack a)
 
 deriving instance Eq ServantError
+deriving instance Eq ServantConnectionError
 
 instance Eq C.HttpException where
   a == b = show a == show b
@@ -167,8 +170,8 @@ spec = withServer $ \ baseUrl -> do
       getMatrixParam :: Maybe String -> GenHaxl () Person
       getMatrixParams :: [String] -> GenHaxl () [Person]
       getMatrixFlag :: Bool -> GenHaxl () Bool
-      getRawSuccess :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
-      getRawFailure :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], C.Response ByteString)
+      getRawSuccess :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], ServantResponse)
+      getRawFailure :: Method -> GenHaxl () (Int, ByteString, MediaType, [HTTP.Header], ServantResponse)
       getMultiple :: String -> Maybe Int -> Bool -> [(String, [Rational])] -> GenHaxl () (String, Maybe Int, Bool, [(String, [Rational])])
       getRespHeaders :: GenHaxl () (Headers TestHeaders Bool)
       getDeleteContentType :: GenHaxl () ()
@@ -241,7 +244,7 @@ spec = withServer $ \ baseUrl -> do
       res <- testHaxl (getRawSuccess methodGet)
       case res of
         Left e -> assertFailure $ show e
-        Right (code, body, ct, _, response) -> do
+        Right (code, body, ct, _, (ServantResponse response)) -> do
           (code, body, ct) `shouldBe` (200, "rawSuccess", "application"//"octet-stream")
           C.responseBody response `shouldBe` body
           C.responseStatus response `shouldBe` ok200
@@ -250,7 +253,7 @@ spec = withServer $ \ baseUrl -> do
       res <- testHaxl (getRawFailure methodGet)
       case res of
         Left e -> assertFailure $ show e
-        Right (code, body, ct, _, response) -> do
+        Right (code, body, ct, _, (ServantResponse response)) -> do
           (code, body, ct) `shouldBe` (400, "rawFailure", "application"//"octet-stream")
           C.responseBody response `shouldBe` body
           C.responseStatus response `shouldBe` badRequest400
@@ -319,7 +322,7 @@ failSpec = withFailServer $ \ baseUrl -> do
       it "reports ConnectionError" $ do
         Left res <- testHaxl getGetWrongHost
         case res of
-          ConnectionError (C.FailedConnectionException2 "127.0.0.1" 19872 False _) -> return ()
+          ConnectionError (ServantConnectionError (C.FailedConnectionException2 "127.0.0.1" 19872 False _)) -> return ()
           _ -> fail $ "expected ConnectionError, but got " <> show res
 
       it "reports UnsupportedContentType" $ do

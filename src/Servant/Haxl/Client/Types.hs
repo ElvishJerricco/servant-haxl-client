@@ -7,9 +7,9 @@ import           Data.ByteString.Lazy
 import           Data.Hashable
 import           Data.Text
 import           GHC.Generics
-import           Network.HTTP.Client
 import           Network.HTTP.Media
 import           Network.HTTP.Types
+import           Servant.Haxl.Client.Internal.Error
 
 data ServantError
   = FailureResponse
@@ -27,7 +27,7 @@ data ServantError
     , responseBody        :: ByteString
     }
   | ConnectionError
-    { connectionError :: HttpException
+    { connectionError :: ServantConnectionError
     }
   | InvalidContentTypeHeader
     { responseContentTypeHeader :: ByteString

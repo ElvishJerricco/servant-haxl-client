@@ -29,6 +29,8 @@ library
     Servant.Haxl.Client.BaseUrl
     Servant.Haxl.Client.Req
     Servant.Haxl.Client.Types
+    Servant.Haxl.Client.Internal
+    Servant.Haxl.Client.Internal.Error
   build-depends:
       base >=4.8 && <5
     , aeson
@@ -50,6 +52,7 @@ library
     , text
     , transformers
   hs-source-dirs: src
+                , src-ghc
   default-language: Haskell2010
   ghc-options: -Wall
 
