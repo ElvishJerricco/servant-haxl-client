@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
-module Servant.Common.Req.Haxl where
+module Servant.Haxl.Client.Req where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.QSem
@@ -31,8 +31,8 @@ import           Network.HTTP.Types
 import qualified Network.HTTP.Types.Header   as HTTP
 import           Network.URI
 import           Servant.API.ContentTypes
-import           Servant.Common.BaseUrl.Haxl
 import           Servant.Common.Text
+import           Servant.Haxl.Client.BaseUrl
 
 import qualified Network.HTTP.Client         as Client
 

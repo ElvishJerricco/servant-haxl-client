@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ViewPatterns  #-}
-module Servant.Common.BaseUrl.Haxl where
+module Servant.Haxl.Client.BaseUrl where
 
 import           Data.Hashable
 import           Data.List
