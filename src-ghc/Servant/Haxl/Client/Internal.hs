@@ -5,7 +5,11 @@
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
 
-module Servant.Haxl.Client.Internal where
+module Servant.Haxl.Client.Internal
+  ( ServantResponse(..)
+  , ServantRequest(..)
+  , initServantClientState
+  ) where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.QSem

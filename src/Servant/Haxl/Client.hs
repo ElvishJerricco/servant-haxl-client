@@ -36,8 +36,6 @@ import           Servant.API
 import           Servant.Haxl.Client.Types
 import           Servant.Haxl.Client.Req
 import           Servant.Haxl.Client.BaseUrl
-import           Servant.Haxl.Client.Internal
-import           Servant.Haxl.Client.Internal.Error
 
 -- * Accessing APIs as a Client
 

@@ -7,6 +7,8 @@
 module Servant.Haxl.Client.Req
   ( Req
   , ServantError
+  , ServantResponse
+  , ServantConnectionError
   , defReq
   , appendToPath
   , appendToMatrixParams
@@ -22,19 +24,20 @@ module Servant.Haxl.Client.Req
 
 import           Control.Monad
 import           Control.Monad.Catch
-import           Data.ByteString.Lazy         hiding (elem, filter, map, null,
-                                               pack)
+import           Data.ByteString.Lazy               hiding (elem, filter, map,
+                                                     null, pack)
 import           Data.Proxy
 import           Data.String.Conversions
-import           Data.Text                    (Text)
-import           Haxl.Core                    hiding (Request, catch)
+import           Data.Text                          (Text)
+import           Haxl.Core                          hiding (Request, catch)
 import           Network.HTTP.Media
 import           Network.HTTP.Types
-import qualified Network.HTTP.Types.Header    as HTTP
+import qualified Network.HTTP.Types.Header          as HTTP
 import           Servant.API.ContentTypes
 import           Servant.Common.Text
 import           Servant.Haxl.Client.BaseUrl
 import           Servant.Haxl.Client.Internal
+import           Servant.Haxl.Client.Internal.Error
 import           Servant.Haxl.Client.Types
 
 defReq :: Req

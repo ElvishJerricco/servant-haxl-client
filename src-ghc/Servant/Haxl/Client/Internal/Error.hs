@@ -1,4 +1,6 @@
-module Servant.Haxl.Client.Internal.Error where
+module Servant.Haxl.Client.Internal.Error
+  ( ServantConnectionError(..)
+  ) where
 
 import           Network.HTTP.Client
 

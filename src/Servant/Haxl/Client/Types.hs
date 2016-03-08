@@ -1,6 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Servant.Haxl.Client.Types where
+module Servant.Haxl.Client.Types
+  ( ServantError(..)
+  , ServantConnectionError
+  , Req(..)
+  , WantedStatusCodes(..)
+  , Scheme(..)
+  , BaseUrl(..)
+  ) where
 
 import           Control.Exception
 import           Data.ByteString.Lazy
