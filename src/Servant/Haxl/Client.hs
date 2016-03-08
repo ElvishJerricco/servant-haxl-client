@@ -32,8 +32,9 @@ import           Network.HTTP.Media
 import qualified Network.HTTP.Types         as H
 import qualified Network.HTTP.Types.Header  as HTTP
 import           Servant.API
-import           Servant.Haxl.Client.BaseUrl
+import           Servant.Haxl.Client.Types
 import           Servant.Haxl.Client.Req
+import           Servant.Haxl.Client.BaseUrl
 
 -- * Accessing APIs as a Client
 

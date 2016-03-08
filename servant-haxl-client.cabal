@@ -28,6 +28,7 @@ library
     Servant.Haxl.Client
     Servant.Haxl.Client.BaseUrl
     Servant.Haxl.Client.Req
+    Servant.Haxl.Client.Types
   build-depends:
       base >=4.8 && <5
     , aeson

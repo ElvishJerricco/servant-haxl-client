@@ -1,34 +1,16 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ViewPatterns  #-}
-module Servant.Haxl.Client.BaseUrl where
+{-# LANGUAGE ViewPatterns #-}
+module Servant.Haxl.Client.BaseUrl
+  ( Scheme(..)
+  , BaseUrl(..)
+  , showBaseUrl
+  , parseBaseUrl
+  ) where
 
-import           Data.Hashable
 import           Data.List
-import           GHC.Generics
 import           Network.URI
 import           Safe
+import           Servant.Haxl.Client.Types
 import           Text.Read
-
--- | URI scheme to use
-data Scheme =
-    Http  -- ^ http://
-  | Https -- ^ https://
-  deriving (Show, Eq, Ord, Generic)
-
-instance Hashable Scheme where
-  hashWithSalt s Http = hashWithSalt s (0 :: Int)
-  hashWithSalt s Https = hashWithSalt s (1 :: Int)
-
--- | Simple data type to represent the target of HTTP requests
---   for servant's automatically-generated clients.
-data BaseUrl = BaseUrl
-  { baseUrlScheme :: Scheme -- ^ URI scheme to use
-  , baseUrlHost   :: String   -- ^ host (eg "haskell.org")
-  , baseUrlPort   :: Int      -- ^ port (eg 80)
-  } deriving (Show, Eq, Ord, Generic)
-
-instance Hashable BaseUrl where
-  hashWithSalt s (BaseUrl sc h p) = hashWithSalt s (sc, h, p)
 
 showBaseUrl :: BaseUrl -> String
 showBaseUrl (BaseUrl urlscheme host port) =

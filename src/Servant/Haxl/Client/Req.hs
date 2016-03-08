@@ -1,12 +1,25 @@
 {-# LANGUAGE CPP                   #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
-module Servant.Haxl.Client.Req where
+module Servant.Haxl.Client.Req
+  ( Req
+  , ServantError
+  , defReq
+  , appendToPath
+  , appendToMatrixParams
+  , appendToQueryString
+  , addHeader
+  , setRQBody
+  , displayHttpRequest
+  , initServantClientState
+  , performRequest
+  , performRequestCT
+  , performRequestNoBody
+  ) where
 
 import           Control.Concurrent.Async
 import           Control.Concurrent.QSem
@@ -23,7 +36,6 @@ import           Data.String
 import           Data.String.Conversions
 import           Data.Text                   (Text)
 import           Data.Text.Encoding
-import           GHC.Generics
 import           Haxl.Core                   hiding (Request, catch)
 import           Network.HTTP.Client         hiding (Proxy)
 import           Network.HTTP.Client.TLS
@@ -34,56 +46,9 @@ import           Network.URI
 import           Servant.API.ContentTypes
 import           Servant.Common.Text
 import           Servant.Haxl.Client.BaseUrl
+import           Servant.Haxl.Client.Types
 
 import qualified Network.HTTP.Client         as Client
-
-data ServantError
-  = FailureResponse
-    { responseStatus      :: Status
-    , responseContentType :: MediaType
-    , responseBody        :: ByteString
-    }
-  | DecodeFailure
-    { decodeError         :: String
-    , responseContentType :: MediaType
-    , responseBody        :: ByteString
-    }
-  | UnsupportedContentType
-    { responseContentType :: MediaType
-    , responseBody        :: ByteString
-    }
-  | ConnectionError
-    { connectionError :: HttpException
-    }
-  | InvalidContentTypeHeader
-    { responseContentTypeHeader :: ByteString
-    , responseBody              :: ByteString
-    }
-  deriving (Show)
-
-instance Exception ServantError where
-
-data Req = Req
-  { reqPath   :: String
-  , qs        :: QueryText
-  , reqBody   :: Maybe (ByteString, MediaType)
-  , reqAccept :: [MediaType]
-  , headers   :: [(String, Text)]
-  } deriving (Show, Eq, Ord, Generic)
-
-instance Hashable Req where
-  hashWithSalt s (Req p q b a h) = hashWithSalt s (p, q, bHash, aHash, h)
-    where
-      hashMediaType m = hashWithSalt s (show m)
-      bHash = fmap (fmap hashMediaType) b
-      aHash = fmap hashMediaType a
-
-data WantedStatusCodes = AllCodes | SelectCodes [Int]
-  deriving (Show, Eq, Ord, Generic)
-
-instance Hashable WantedStatusCodes where
-  hashWithSalt s AllCodes = hashWithSalt s (0::Int)
-  hashWithSalt s (SelectCodes codes) = hashWithSalt s (1::Int, codes)
 
 defReq :: Req
 defReq = Req "" [] Nothing [] []
