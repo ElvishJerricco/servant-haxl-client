@@ -132,7 +132,7 @@ instance DataSource () ServantRequest where
     mapM_ wait asyncs
     where
       handler :: QSem -> BlockedFetch ServantRequest -> IO (Async ())
-      handler sem (BlockedFetch ((ServantRequest met req wantedStatus reqHost) :: ServantRequest a) rvar) =
+      handler sem (BlockedFetch (ServantRequest met req wantedStatus reqHost) rvar) =
         async $ bracket_ (waitQSem sem) (signalQSem sem) $ do
           e <- runEitherT $ performRequest_ manager met req wantedStatus reqHost
           case e of

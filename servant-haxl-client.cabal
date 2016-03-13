@@ -1,5 +1,5 @@
 name:                servant-haxl-client
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis: automatical derivation of querying functions for servant webservices
 description:
   This library lets you derive automatically Haskell functions that
@@ -41,8 +41,6 @@ library
     , exceptions
     , hashable
     , haxl
-    , http-client
-    , http-client-tls
     , http-media
     , http-types
     , network-uri >= 2.6
@@ -52,9 +50,18 @@ library
     , text
     , transformers
   hs-source-dirs: src
-                , src-ghc
   default-language: Haskell2010
   ghc-options: -Wall
+  if impl(ghcjs)
+    build-depends:
+        ghcjs-base
+      , case-insensitive
+    hs-source-dirs: src-ghcjs
+  else
+    build-depends:
+        http-client
+      , http-client-tls
+    hs-source-dirs: src-ghc
 
 test-suite spec
   type: exitcode-stdio-1.0
