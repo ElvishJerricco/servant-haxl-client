@@ -37,7 +37,6 @@ import qualified JavaScript.Web.XMLHttpRequest      as XHR
 import           Network.HTTP.Media
 import           Network.HTTP.Types
 import qualified Network.HTTP.Types.Header          as HTTP
-import           Network.HTTP.Types.URI
 import           Network.URI
 import           Servant.Haxl.Client.BaseUrl
 import           Servant.Haxl.Client.Internal.Error
